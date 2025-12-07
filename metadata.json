@@ -1,0 +1,7 @@
+{
+  "name": "ChatBot Pro",
+  "description": "WhatsApp automation bot builder with human handoff capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
