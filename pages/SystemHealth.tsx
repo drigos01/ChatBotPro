@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiConfig } from '../types';
-import { Activity, CheckCircle2, XCircle, Send, Smartphone, Battery, Server, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, Send, Smartphone, Battery, Server, RefreshCw, AlertTriangle, ShieldCheck, CloudLightning } from 'lucide-react';
 
 interface SystemHealthProps {
     apiConfig: ApiConfig;
@@ -14,8 +14,14 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ apiConfig }) => {
     const [sending, setSending] = useState(false);
     const [sendResult, setSendResult] = useState<{success: boolean, msg: string} | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
+    const [isManaged, setIsManaged] = useState(false);
 
     useEffect(() => {
+        // Check if env vars are present safely
+        const env = (import.meta as any).env || {};
+        if (env.VITE_GREEN_API_ID && env.VITE_GREEN_API_TOKEN) {
+            setIsManaged(true);
+        }
         checkHealth();
     }, []);
 
@@ -30,11 +36,16 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ apiConfig }) => {
             return;
         }
 
-        const cleanHost = apiConfig.hostUrl.replace(/\/$/, '');
+        const cleanHost = apiConfig.hostUrl.trim().replace(/\/$/, '');
+        const idInstance = apiConfig.idInstance.trim();
+        const apiTokenInstance = apiConfig.apiTokenInstance.trim();
 
         try {
             // Check State (Green API Endpoint: getStateInstance)
-            const statusRes = await fetch(`${cleanHost}/waInstance${apiConfig.idInstance}/getStateInstance/${apiConfig.apiTokenInstance}`);
+            const statusRes = await fetch(`${cleanHost}/waInstance${idInstance}/getStateInstance/${apiTokenInstance}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
             
             if (!statusRes.ok) {
                 throw new Error(`HTTP Error: ${statusRes.status} - ${statusRes.statusText}`);
@@ -54,7 +65,7 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ apiConfig }) => {
             console.error("Health check failed", error);
             let msg = error.message;
             if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-                msg = 'Falha de conexão. Possível bloqueio CORS ou URL incorreta. Verifique se o Host URL está correto e acessível.';
+                msg = 'Falha de conexão. Verifique URL do Host, bloqueios de rede ou CORS.';
             }
             setLastError(msg);
             setStatus('error');
@@ -66,13 +77,16 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ apiConfig }) => {
         setSending(true);
         setSendResult(null);
 
-        const cleanHost = apiConfig.hostUrl.replace(/\/$/, '');
+        const cleanHost = apiConfig.hostUrl.trim().replace(/\/$/, '');
+        const idInstance = apiConfig.idInstance.trim();
+        const apiTokenInstance = apiConfig.apiTokenInstance.trim();
+        
         // Format phone: remove non-digits
         const cleanPhone = testPhone.replace(/\D/g, '');
         const chatId = `${cleanPhone}@c.us`;
 
         try {
-            const response = await fetch(`${cleanHost}/waInstance${apiConfig.idInstance}/sendMessage/${apiConfig.apiTokenInstance}`, {
+            const response = await fetch(`${cleanHost}/waInstance${idInstance}/sendMessage/${apiTokenInstance}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -107,9 +121,16 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ apiConfig }) => {
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Activity className="text-emerald-500" /> Status do Sistema
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            <Activity className="text-emerald-500" /> Status do Sistema
+                        </h1>
+                        {isManaged && (
+                            <span className="px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[10px] font-bold uppercase tracking-wide border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                                <CloudLightning size={10} /> Vercel Managed
+                            </span>
+                        )}
+                    </div>
                     <p className="text-gray-500 dark:text-gray-400">Diagnóstico de conexão Green API.</p>
                 </div>
                 <button 

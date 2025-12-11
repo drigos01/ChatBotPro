@@ -51,15 +51,22 @@ export const WhatsAppConnect: React.FC<WhatsAppConnectProps> = ({
       setLoadingQr(true);
       onConnect(); 
 
-      const cleanHost = (apiConfig.hostUrl || 'https://7103.api.greenapi.com').replace(/\/$/, '');
-      const { idInstance, apiTokenInstance } = apiConfig;
+      const cleanHost = (apiConfig.hostUrl || 'https://7103.api.greenapi.com').trim().replace(/\/$/, '');
+      const idInstance = apiConfig.idInstance.trim();
+      const apiTokenInstance = apiConfig.apiTokenInstance.trim();
 
       try {
           // 1. Check Status First (getStateInstance)
-          const statusRes = await fetch(`${cleanHost}/waInstance${idInstance}/getStateInstance/${apiTokenInstance}`);
+          const statusRes = await fetch(`${cleanHost}/waInstance${idInstance}/getStateInstance/${apiTokenInstance}`, {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json'
+              }
+          });
           
           if (!statusRes.ok) {
                if(statusRes.status === 401) throw new Error("Não autorizado. Verifique ID e Token.");
+               if(statusRes.status === 404) throw new Error("Instância não encontrada (404). Verifique o ID e o Host.");
                throw new Error(`Erro ao verificar status: ${statusRes.status}`);
           }
 
@@ -71,7 +78,12 @@ export const WhatsAppConnect: React.FC<WhatsAppConnectProps> = ({
           }
 
           // 2. Fetch QR Code (Green API returns JSON with Base64)
-          const qrRes = await fetch(`${cleanHost}/waInstance${idInstance}/qrCode/${apiTokenInstance}`);
+          const qrRes = await fetch(`${cleanHost}/waInstance${idInstance}/qrCode/${apiTokenInstance}`, {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json'
+              }
+          });
           
           if (!qrRes.ok) {
               throw new Error("Falha ao buscar QR Code. Verifique sua conexão.");
@@ -83,6 +95,10 @@ export const WhatsAppConnect: React.FC<WhatsAppConnectProps> = ({
               // Green API returns raw base64 string in 'message' field
               setQrCodeBase64(`data:image/png;base64,${qrData.message}`);
           } else {
+             // Sometimes Green API returns message: "QR code not generated" if already logged in or starting
+             if (qrData && qrData.message) {
+                 throw new Error(`API: ${qrData.message}`);
+             }
              throw new Error("Formato de QR Code inválido recebido da API.");
           }
 
@@ -91,7 +107,7 @@ export const WhatsAppConnect: React.FC<WhatsAppConnectProps> = ({
           let msg = error.message || 'Erro de conexão com a API.';
           
           if (msg.includes('Failed to fetch')) {
-              msg = 'Falha de Conexão. Verifique se a URL do Host está correta (ex: https://7103.api.greenapi.com) e se sua internet está ativa.';
+              msg = 'Falha de Conexão (Network/CORS). Verifique se a URL do Host está correta e se o servidor permite acesso.';
           }
           
           setConnectionError(msg);

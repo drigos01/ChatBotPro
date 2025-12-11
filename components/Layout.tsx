@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ViewState, User } from '../types';
-import { LayoutDashboard, GitMerge, MessageSquare, Smartphone, LogOut, Menu, X, User as UserIcon, Shield, Settings, Edit3, Camera, Save, Phone, Info, Moon, Sun, MessageCircle, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeft, CreditCard, Clock, AlertTriangle, AlertCircle, Users, Contact, Activity } from 'lucide-react';
+import { LayoutDashboard, GitMerge, MessageSquare, Smartphone, LogOut, Menu, X, User as UserIcon, Shield, Settings, Edit3, Camera, Save, Phone, Info, Moon, Sun, MessageCircle, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeft, CreditCard, Clock, AlertTriangle, AlertCircle, Users, Contact, Activity, Code } from 'lucide-react';
 
 interface LayoutProps {
   currentView: ViewState;
@@ -77,9 +77,11 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
           return {
               days: 0,
               badgeColor: 'bg-red-100 text-red-600 border-red-200',
+              indicatorColor: 'bg-red-500',
+              textColor: 'text-red-500',
               icon: AlertCircle,
               text: 'Expirado',
-              fullText: 'Sua licença expirou',
+              fullText: 'Licença Expirada',
               urgent: true
           };
       }
@@ -88,6 +90,8 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
           return {
               days: daysLeft,
               badgeColor: 'bg-red-100 text-red-600 border-red-200 animate-pulse',
+              indicatorColor: 'bg-red-500',
+              textColor: 'text-red-500',
               icon: AlertTriangle,
               text: `${daysLeft}d restantes`,
               fullText: `Expira em ${daysLeft} dias`,
@@ -99,6 +103,8 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
           return {
               days: daysLeft,
               badgeColor: 'bg-amber-100 text-amber-700 border-amber-200',
+              indicatorColor: 'bg-amber-500',
+              textColor: 'text-amber-500',
               icon: Clock,
               text: `${daysLeft}d restantes`,
               fullText: `Expira em ${daysLeft} dias`,
@@ -110,14 +116,37 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
       return {
           days: daysLeft,
           badgeColor: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+          indicatorColor: 'bg-emerald-500',
+          textColor: 'text-emerald-500',
           icon: Shield,
-          text: isTrial ? 'Trial Ativo' : 'PRO Ativo',
+          text: isTrial ? 'Trial' : 'PRO',
           fullText: `${isTrial ? 'Teste' : 'Premium'} • ${daysLeft} dias`,
           urgent: false
       };
   };
 
   const subStatus = getSubscriptionStatus();
+
+  // Subtle Header Indicator Component
+  const SubscriptionHeaderIndicator = () => {
+      if (!subStatus) return null;
+      return (
+          <div 
+            className="flex items-center gap-1.5 ml-2 cursor-pointer group relative"
+            onClick={() => { onChangeView('subscription'); setIsMobileMenuOpen(false); }}
+          >
+              <div className={`w-2 h-2 rounded-full ${subStatus.indicatorColor} ${subStatus.urgent ? 'animate-pulse' : ''}`}></div>
+              <span className={`text-[10px] font-bold uppercase tracking-wide ${subStatus.textColor} hidden md:inline-block opacity-80 group-hover:opacity-100`}>
+                  {subStatus.days <= 0 ? 'Expirado' : subStatus.days <= 7 ? `${subStatus.days} dias` : 'Ativo'}
+              </span>
+              
+              {/* Tooltip for Mobile/Desktop */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  {subStatus.fullText}
+              </div>
+          </div>
+      );
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
@@ -128,6 +157,8 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
               <MessageCircle size={20} fill="currentColor" className="text-emerald-600 dark:text-emerald-400" />
           </div>
           <span className="font-bold text-gray-800 dark:text-white">ChatBot Pro</span>
+          {/* Mobile Status Indicator */}
+          <SubscriptionHeaderIndicator />
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="dark:text-white p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
           {isMobileMenuOpen ? <X /> : <Menu />}
@@ -146,7 +177,14 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
                 <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0">
                     <MessageCircle size={22} fill="currentColor" />
                 </div>
-                {!isSidebarCollapsed && <span className="font-bold text-xl text-gray-800 dark:text-white tracking-tight truncate">ChatBot Pro</span>}
+                {!isSidebarCollapsed && (
+                    <div className="flex flex-col">
+                        <span className="font-bold text-lg text-gray-800 dark:text-white tracking-tight leading-none">ChatBot Pro</span>
+                        <div className="flex items-center mt-0.5">
+                             <SubscriptionHeaderIndicator />
+                        </div>
+                    </div>
+                )}
             </div>
              {/* Mobile Close Button */}
              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-gray-500">
@@ -174,11 +212,12 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
                 <NavItem view="flows" icon={GitMerge} label="Fluxos" restricted={true} />
                 <NavItem view="team" icon={Users} label="Equipe" restricted={true} />
                 <NavItem view="subscription" icon={CreditCard} label="Minha Assinatura" restricted={true} />
+                <NavItem view="developer" icon={Code} label="Área do Dev" restricted={true} />
               </>
           )}
         </div>
 
-        {/* Bottom Section - NOW INCLUDES SUBTLE STATUS */}
+        {/* Bottom Section */}
         <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
            {/* Collapse Button (Desktop Only) */}
            <div className="hidden md:flex justify-end p-2 border-b border-gray-100 dark:border-gray-700">
@@ -190,29 +229,6 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, child
                     {isSidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
                 </button>
            </div>
-
-           {/* Integrated Subscription Badge - Subtle */}
-           {subStatus && (
-               <div className={`px-3 pt-3 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
-                   <button 
-                       onClick={() => { onChangeView('subscription'); setIsMobileMenuOpen(false); }}
-                       className={`
-                           flex items-center gap-2 rounded-lg border px-3 py-2 w-full transition-all
-                           ${subStatus.badgeColor} hover:brightness-95
-                           ${isSidebarCollapsed ? 'justify-center px-0 w-10 h-10' : ''}
-                       `}
-                       title={subStatus.fullText}
-                   >
-                       <subStatus.icon size={16} className={subStatus.urgent ? "animate-pulse shrink-0" : "shrink-0"} />
-                       {!isSidebarCollapsed && (
-                           <div className="flex-1 flex justify-between items-center text-xs font-bold truncate">
-                               <span>{subStatus.text}</span>
-                               {subStatus.urgent && <span className="text-[10px] underline">Renovar</span>}
-                           </div>
-                       )}
-                   </button>
-               </div>
-           )}
 
            <div className="p-3">
                {toggleDarkMode && (

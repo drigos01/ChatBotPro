@@ -9,7 +9,7 @@ interface ContactListProps {
 }
 
 export const ContactList: React.FC<ContactListProps> = ({ apiConfig, onStartChat, existingConversations }) => {
-    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [contacts, setContacts] = useState<(Contact & { avatarUrl?: string })[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +17,21 @@ export const ContactList: React.FC<ContactListProps> = ({ apiConfig, onStartChat
     useEffect(() => {
         fetchContacts();
     }, []);
+
+    const fetchAvatar = async (chatId: string): Promise<string | undefined> => {
+        const cleanHost = apiConfig.hostUrl.replace(/\/$/, '');
+        try {
+            const res = await fetch(`${cleanHost}/waInstance${apiConfig.idInstance}/getAvatar/${apiConfig.apiTokenInstance}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId })
+            });
+            if(res.ok) {
+                const data = await res.json();
+                return data.urlAvatar;
+            }
+        } catch(e) { return undefined; }
+    };
 
     const fetchContacts = async () => {
         if (!apiConfig.idInstance || !apiConfig.apiTokenInstance) {
@@ -40,17 +55,38 @@ export const ContactList: React.FC<ContactListProps> = ({ apiConfig, onStartChat
             const data = await response.json();
             
             // Map to internal Contact interface
-            const mappedContacts: Contact[] = data.map((c: any) => ({
+            const mappedContacts = data.map((c: any) => ({
                 id: c.id,
                 name: c.name || c.contactName || c.id.split('@')[0],
                 type: c.type || 'user',
                 contactName: c.contactName
             }));
 
-            // Basic dedup by ID just in case
-            const uniqueContacts = Array.from(new Map(mappedContacts.map(item => [item.id, item])).values());
+            // Basic dedup
+            const uniqueContacts = Array.from(new Map(mappedContacts.map((item: any) => [item.id, item])).values());
             
-            setContacts(uniqueContacts);
+            setContacts(uniqueContacts as any);
+
+            // Lazy fetch avatars for visible items (limit to first 20 to save API calls)
+            // In a real app, use IntersectionObserver
+            const contactsWithAvatars = [...(uniqueContacts as any[])];
+            let changed = false;
+
+            // Fetch first 10 avatars asynchronously
+            const batch = uniqueContacts.slice(0, 15);
+            
+            Promise.all(batch.map(async (c: any) => {
+                const url = await fetchAvatar(c.id);
+                if (url) {
+                    const idx = contactsWithAvatars.findIndex((x:any) => x.id === c.id);
+                    if (idx !== -1) {
+                        contactsWithAvatars[idx] = { ...contactsWithAvatars[idx], avatarUrl: url };
+                        changed = true;
+                    }
+                }
+            })).then(() => {
+                if(changed) setContacts([...contactsWithAvatars] as any);
+            });
 
         } catch (err: any) {
             console.error("Error fetching contacts:", err);
@@ -128,19 +164,23 @@ export const ContactList: React.FC<ContactListProps> = ({ apiConfig, onStartChat
                             return (
                                 <div key={contact.id} className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-md transition-all group bg-gray-50 dark:bg-gray-700/30">
                                     <div className="flex items-start justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${isGroup ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
-                                                {isGroup ? <Users size={18} /> : <User size={18} />}
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm shrink-0 overflow-hidden ${isGroup ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
+                                                {contact.avatarUrl ? (
+                                                    <img src={contact.avatarUrl} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    isGroup ? <Users size={18} /> : <User size={18} />
+                                                )}
                                             </div>
-                                            <div>
-                                                <h3 className="font-bold text-gray-800 dark:text-white text-sm truncate max-w-[150px]" title={contact.name}>{contact.name}</h3>
+                                            <div className="min-w-0">
+                                                <h3 className="font-bold text-gray-800 dark:text-white text-sm truncate" title={contact.name}>{contact.name}</h3>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 font-mono flex items-center gap-1">
                                                     {isGroup ? 'Grupo' : <><Phone size={10} /> {phoneNumber}</>}
                                                 </p>
                                             </div>
                                         </div>
                                         {status && (
-                                            <span className={`px-2 py-0.5 text-[10px] rounded-full uppercase font-bold tracking-wide border ${
+                                            <span className={`px-2 py-0.5 text-[10px] rounded-full uppercase font-bold tracking-wide border shrink-0 ${
                                                 status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                                                 status === 'human_handoff' ? 'bg-amber-100 text-amber-700 border-amber-200' :
                                                 status === 'in_progress' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
